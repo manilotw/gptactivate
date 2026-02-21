@@ -1,0 +1,173 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5, user-scalable=yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="gptactivate">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#0d0118" media="(prefers-color-scheme: dark)">
+    <title>gptactivate</title>
+    <meta name="description" content="Safe and fast subscription activation service by DevIX">
+    <link rel="icon" type="image/png" href="{% static 'activator/img/artificial-intelligence.png' %}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link rel="stylesheet" href="{% static 'activator/css/style.css' %}?v=4">
+
+    <!-- Prevent FOUC: apply theme immediately -->
+    <script>
+        (function(){
+            var m = document.cookie.match(/(?:^;\s*)theme=(light|dark)/);
+            var t = m ? m[1] : (window.matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
+            document.documentElement.classList.add(t);
+            document.documentElement.style.colorScheme = t;
+        })();
+    </script>
+</head>
+<body>
+
+    <!-- ===== HEADER ===== -->
+    <header class="header">
+        <div class="header-inner">
+            <a href="#" class="logo">
+                gptactivate
+                <span class="logo-badge">PLUS</span>
+            </a>
+
+            <nav class="nav">
+                <a href="#" class="nav-link active" id="nav-redeem" data-i18n="nav_redeem">Redeem</a>
+                <!-- <a href="#" class="nav-link" id="nav-batch">Batch Check</a> -->
+            </nav>
+
+            <div class="header-actions">
+                <button class="icon-btn lang-btn" title="Language" id="langBtn">
+                    RU
+                </button>
+                <button class="icon-btn" title="Toggle theme" id="themeToggle">
+                    <!-- Sun icon (light mode) -->
+                    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <!-- Moon icon (dark mode) -->
+                    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ===== MAIN ===== -->
+    <main class="main">
+        <h1 class="page-title" data-i18n="page_title">Redeem Key</h1>
+        <p class="page-subtitle" data-i18n="page_subtitle">Safe and fast subscription activation service</p>
+
+        <!-- Stepper -->
+        <div class="stepper">
+            <div class="step-indicator active" id="step1"><span>1</span></div>
+            <div class="step-line" id="line1"></div>
+            <div class="step-indicator inactive" id="step2"><span>2</span></div>
+            <div class="step-line" id="line2"></div>
+            <div class="step-indicator inactive" id="step3"><span>3</span></div>
+        </div>
+
+        <!-- Card -->
+        <div class="card">
+            <!-- Section 1: Enter Key -->
+            <div class="card-section" id="section1">
+                <h2 class="section-title" data-i18n="section1_title">Enter and verify your Key</h2>
+                <div class="input-row" style="margin-top: 14px;">
+                    <input type="text" class="input" id="keyInput" placeholder="Enter your activation key" data-i18n-placeholder="key_placeholder" autocomplete="off" spellcheck="false">
+                    <button class="btn btn-primary" id="validateKeyBtn" data-i18n="validate">Validate</button>
+                </div>
+                <div class="status-msg" id="keyStatus">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
+                    <span id="keyStatusText"></span>
+                </div>
+            </div>
+
+            <!-- Section 2: AuthSession -->
+            <div class="card-section disabled" id="section2">
+                <div class="section-header">
+                    <h2 class="section-title" data-i18n="section2_title">Get AuthSession data</h2>
+                    <div class="section-links">
+                        <a href="https://chatgpt.com/" class="section-link" target="_blank" rel="noopener noreferrer">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            <span data-i18n="open_chatgpt">Open ChatGPT</span>
+                        </a>
+                        <a href="https://chatgpt.com/api/auth/session" class="section-link" target="_blank" rel="noopener noreferrer">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            <span data-i18n="open_auth">Open AuthSession Page</span>
+                        </a>
+                    </div>
+                </div>
+                <p class="section-desc" data-i18n="section2_desc">Open the page below, copy the full JSON content, then paste it and click validate.</p>
+                <textarea class="textarea" id="authTextarea" placeholder="Paste the full JSON from AuthSession page" data-i18n-placeholder="auth_placeholder"></textarea>
+                <div class="btn-row">
+                    <button class="btn btn-primary btn-sm" id="validateAuthBtn" data-i18n="validate">Validate</button>
+                </div>
+                <div class="status-msg" id="authStatus">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
+                    <span id="authStatusText"></span>
+                </div>
+            </div>
+
+            <!-- Section 3: Activate -->
+            <div class="card-section disabled" id="section3">
+                <button class="btn btn-activate" id="activateBtn" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                    <span data-i18n="activate">Activate</span>
+                </button>
+                <div class="status-msg" id="activationStatus">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>
+                    <span id="activationStatusText"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Warning -->
+        <div class="warning-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <span data-i18n="warning_note">After activation, try refreshing the target page multiple times. The page will refresh itself to update the subscription status.</span>
+        </div>
+    </main>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-logo">
+                gptactivate
+                <span class="logo-badge" style="font-size:0.55rem;">PLUS</span>
+            </div>
+            <p class="footer-slogan" data-i18n="footer_slogan">Fast & secure key activation</p>
+            <div class="footer-links">
+                <!-- <a href="#" class="footer-link">Telegram</a>
+                <a href="#" class="footer-link">Support</a> -->
+                <!-- <a href="#" class="footer-link">API Docs</a> -->
+                <!-- <a href="#" class="footer-link">Terms</a> -->
+            </div>
+            <p class="footer-copy">© 2026 gptactivate. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="{% static 'activator/js/script.js' %}?v=4"></script>
+</body>
+</html>
