@@ -167,14 +167,17 @@ def check_key_status(request):
                 }, status=400)
                 
         except Exception as e:
+            logger.error(f'Key check API error: {str(e)}', exc_info=True)
             return JsonResponse({
                 'status': 'error',
                 'message': get_message('key_check_error', lang)
             }, status=500)
         
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.error(f'JSON decode error in check_key_status: {str(e)}')
         return JsonResponse({'status': 'error', 'message': get_message('json_invalid', 'EN')}, status=400)
     except Exception as e:
+        logger.error(f'Unexpected error in check_key_status: {str(e)}', exc_info=True)
         return JsonResponse({'status': 'error', 'message': get_message('server_error', 'EN')}, status=500)
 
 
@@ -244,44 +247,16 @@ def verify_chatgpt_token(request):
             'message': get_message(msg_key, lang)
         }, status=400)
         
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.error(f'JSON decode error in verify_chatgpt_token: {str(e)}')
         return JsonResponse({'status': 'error', 'message': get_message('json_invalid', 'EN')}, status=400)
     except Exception as e:
-        logger.error(f'Unexpected error: {str(e)}')
-        lang = data.get('lang', 'EN') if 'data' in locals() else 'EN'
+        logger.error(f'Unexpected error in verify_chatgpt_token: {str(e)}', exc_info=True)
+        try:
+            lang = data.get('lang', 'EN')
+        except:
+            lang = 'EN'
         return JsonResponse({'status': 'error', 'message': get_message('server_error', lang)}, status=500)
-        
-        # Обработка ошибок
-        error_messages = {
-            'INVALID_JSON': 'Invalid JSON format. Please paste the complete data from /api/auth/session.',
-            'INVALID_FORMAT': 'Invalid data format. Expected JSON object.',
-            'MISSING_DATA': 'Missing required data (user or accessToken). Please paste the complete AuthSession data.',
-            'INVALID_USER_DATA': 'Invalid user data. User must have id and email.',
-            'INVALID_ACCESS_TOKEN': 'Invalid access token format.',
-            'ACCESS_TOKEN_EXPIRED': 'Access token has expired. Please get a fresh session.',
-            'USER_MISMATCH': 'User ID mismatch between session and token.',
-            'EMAIL_MISMATCH': 'Email mismatch between session and token.',
-            'PLAN_MISMATCH': 'Plan type mismatch between session and token.',
-            'SESSION_EXPIRED': 'Session has expired. Please login again.',
-            'INVALID_EXPIRES_FORMAT': 'Invalid expires format in session.',
-            'ACCOUNT_PROBLEM': 'Your account has issues (delinquent). Please resolve them first.',
-        }
-        
-        if isinstance(result, str):
-            error_msg = error_messages.get(result, f'Validation failed: {result}')
-        else:
-            error_msg = 'Unknown validation error'
-        
-        return JsonResponse({
-            'status': 'error',
-            'message': error_msg
-        }, status=400)
-        
-    except json.JSONDecodeError:
-        return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
-    except Exception as e:
-        logger.error(f'Unexpected error: {str(e)}')
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
 @require_http_methods(["POST"])
@@ -375,13 +350,19 @@ def activate_key(request):
                 }, status=400)
                 
         except Exception as e:
+            logger.error(f'Key activation API error: {str(e)}', exc_info=True)
             return JsonResponse({
                 'status': 'error',
                 'message': get_message('server_error', lang)
             }, status=500)
         
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.error(f'JSON decode error in activate_key: {str(e)}')
         return JsonResponse({'status': 'error', 'message': get_message('json_invalid', 'EN')}, status=400)
     except Exception as e:
-        lang = data.get('lang', 'EN') if 'data' in locals() else 'EN'
+        logger.error(f'Unexpected error in activate_key: {str(e)}', exc_info=True)
+        try:
+            lang = data.get('lang', 'EN')
+        except:
+            lang = 'EN'
         return JsonResponse({'status': 'error', 'message': get_message('server_error', lang)}, status=500)
