@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 import requests
 import json
 from parse_keys import check_key_status as check_key_via_api, activate_key as activate_key_via_api
@@ -120,6 +121,7 @@ def index(request):
     return render(request, 'index.html')
 
 
+@csrf_exempt
 @require_http_methods(["POST"])
 def check_key_status(request):
     """Проверка статуса ключа через внешний API"""
@@ -181,6 +183,7 @@ def check_key_status(request):
         return JsonResponse({'status': 'error', 'message': get_message('server_error', 'EN')}, status=500)
 
 
+@csrf_exempt
 @require_http_methods(["POST"])
 def verify_chatgpt_token(request):
     """Проверка ChatGPT AuthSession через детальную проверку"""
@@ -259,6 +262,7 @@ def verify_chatgpt_token(request):
         return JsonResponse({'status': 'error', 'message': get_message('server_error', lang)}, status=500)
 
 
+@csrf_exempt
 @require_http_methods(["POST"])
 def activate_key(request):
     """Активация ключа с AuthSession токеном"""
