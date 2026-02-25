@@ -56,11 +56,11 @@ def check_chatgpt_session(input_data):
         jwt_email = jwt_profile.get('email')
 
         # ========= CONSISTENCY CHECK =========
-        if user.get('id') != jwt_user_id:
-            return 'USER_MISMATCH'
+        # if user.get('id') != jwt_user_id:
+        #     return 'USER_MISMATCH'
 
-        if user.get('email') != jwt_email:
-            return 'EMAIL_MISMATCH'
+        # if user.get('email') != jwt_email:
+        #     return 'EMAIL_MISMATCH'
 
         if account and account.get('planType') != jwt_plan:
             return 'PLAN_MISMATCH'
