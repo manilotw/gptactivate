@@ -761,6 +761,61 @@ html.dark .page-title {
   margin-top: 8px;
 }
 
+.footer-devix {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 2px;
+  line-height: 1;
+}
+
+.footer-devix-logo {
+  display: block;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  filter: none;
+  opacity: 1;
+}
+
+.footer-devix-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.footer-devix-note {
+  white-space: nowrap;
+}
+
+.footer-devix-word {
+  font-weight: 600;
+}
+
+.footer-devix-logo-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.footer-devix-link:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@media (max-width: 420px) {
+  .footer-devix {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .footer-devix-logo {
+    width: 42px;
+    height: 42px;
+  }
+}
+
 /* --- Responsive --- */
 
 /* Tablet: 768px and below */
