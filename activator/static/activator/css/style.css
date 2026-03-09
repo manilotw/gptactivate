@@ -574,6 +574,17 @@ html.dark .page-title {
   box-shadow: 0 1px 4px rgba(139, 92, 246, 0.3);
 }
 
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--input-border);
+}
+
+.btn-ghost:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
 .btn-activate {
   width: 100%;
   padding: 16px;
@@ -702,6 +713,63 @@ html.dark .page-title {
 @keyframes fadeSlide {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Modal --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(9, 9, 11, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
+}
+
+.modal-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-dialog {
+  width: min(440px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(139, 92, 246, 0.15);
+  padding: 18px;
+  transform: translateY(8px) scale(0.98);
+  transition: transform var(--transition-base);
+}
+
+.modal-overlay.show .modal-dialog {
+  transform: translateY(0) scale(1);
+}
+
+.modal-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.modal-text {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 /* --- Footer --- */

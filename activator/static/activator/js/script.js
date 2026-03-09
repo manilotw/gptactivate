@@ -63,6 +63,10 @@
     const activateBtnLabel = activateBtn.querySelector('[data-i18n="activate"]');
     const activateBtnDefaultLabel = activateBtnLabel ? activateBtnLabel.textContent.trim() : 'Activate';
     const langBtn = document.getElementById('langBtn');
+    const planConfirmModal = document.getElementById('planConfirmModal');
+    const planConfirmText = document.getElementById('planConfirmText');
+    const planConfirmOk = document.getElementById('planConfirmOk');
+    const planConfirmCancel = document.getElementById('planConfirmCancel');
 
     const translations = {
         EN: {
@@ -97,7 +101,12 @@
             msg_activation_ok: 'Activation complete! Refresh the target page to see the changes.',
             msg_activation_fail: 'Failed to activate the key. Please try again.',
             msg_server_error_late: 'Server error. Please try again later.',
-            msg_activated: 'Activated'
+            msg_activated: 'Activated',
+            msg_plan_warning: 'You already have an active Go/Pro plan. Press OK to continue and update to Plus.',
+            msg_plan_plus_blocked: 'You already have an active Plus subscription. Try again after expiration.',
+            confirm_title: 'Confirm Action',
+            confirm_continue: 'Continue',
+            confirm_cancel: 'Cancel'
         },
         RU: {
             nav_redeem: 'Активировать',
@@ -131,7 +140,12 @@
             msg_activation_ok: 'Активация завершена! Обновите страницу, чтобы увидеть изменения.',
             msg_activation_fail: 'Не удалось активировать ключ. Попробуйте снова.',
             msg_server_error_late: 'Ошибка сервера. Попробуйте позже.',
-            msg_activated: 'Активировано'
+            msg_activated: 'Активировано',
+            msg_plan_warning: 'У вас уже активен Go/Pro. Нажмите OK, чтобы продолжить и обновить на Plus.',
+            msg_plan_plus_blocked: 'У вас уже активна Plus. Попробуйте после окончания срока.',
+            confirm_title: 'Подтверждение',
+            confirm_continue: 'Обновить',
+            confirm_cancel: 'Отмена'
         },
         CN: {
             nav_redeem: '兑换',
@@ -165,7 +179,12 @@
             msg_activation_ok: '激活完成！请刷新目标页面查看变化。',
             msg_activation_fail: '激活失败，请重试。',
             msg_server_error_late: '服务器错误，请稍后再试。',
-            msg_activated: '已激活'
+            msg_activated: '已激活',
+            msg_plan_warning: '您当前为 Go/Pro。点击 OK 继续并更新为 Plus。',
+            msg_plan_plus_blocked: '您已经是 Plus，请在到期后重试。',
+            confirm_title: '请确认',
+            confirm_continue: '继续',
+            confirm_cancel: '取消'
         }
     };
 
@@ -246,6 +265,17 @@
 
     // --- Stepper Logic ---
     function updateStepper() {
+        const keyFilled = keyInput.value.trim().length > 0;
+        const sessionFilled = authTextarea.value.trim().length > 0;
+
+        if (!keyFilled) {
+            currentStep = 1;
+        } else if (!sessionFilled) {
+            currentStep = 2;
+        } else {
+            currentStep = 3;
+        }
+
         const steps = [step1, step2, step3];
         const lines = [line1, line2];
         const sections = [section1, section2, section3];
@@ -267,15 +297,10 @@
             l.classList.toggle('completed', num < currentStep);
         });
 
-        sections.forEach((sec, i) => {
-            const num = i + 1;
-            sec.classList.toggle('disabled', num > currentStep);
-        });
+        // All sections are available immediately; stepper is visual only.
+        sections.forEach((sec) => sec.classList.remove('disabled'));
 
-        activateBtn.disabled = !(keyValidated && authValidated);
-        if (keyValidated && authValidated) {
-            section3.classList.remove('disabled');
-        }
+        activateBtn.disabled = !(keyFilled && sessionFilled);
     }
 
     // --- Show Status Message ---
@@ -299,6 +324,42 @@
         el.querySelector('svg').innerHTML = '<circle cx="12" cy="12" r="10"></circle>';
     }
 
+    function showPlanConfirm(message) {
+        return new Promise((resolve) => {
+            planConfirmText.textContent = message;
+            planConfirmModal.classList.add('show');
+            planConfirmModal.setAttribute('aria-hidden', 'false');
+
+            const close = (result) => {
+                planConfirmModal.classList.remove('show');
+                planConfirmModal.setAttribute('aria-hidden', 'true');
+                planConfirmOk.removeEventListener('click', onOk);
+                planConfirmCancel.removeEventListener('click', onCancel);
+                planConfirmModal.removeEventListener('click', onBackdrop);
+                document.removeEventListener('keydown', onEsc);
+                resolve(result);
+            };
+
+            const onOk = () => close(true);
+            const onCancel = () => close(false);
+            const onBackdrop = (e) => {
+                if (e.target === planConfirmModal) {
+                    close(false);
+                }
+            };
+            const onEsc = (e) => {
+                if (e.key === 'Escape') {
+                    close(false);
+                }
+            };
+
+            planConfirmOk.addEventListener('click', onOk);
+            planConfirmCancel.addEventListener('click', onCancel);
+            planConfirmModal.addEventListener('click', onBackdrop);
+            document.addEventListener('keydown', onEsc);
+        });
+    }
+
     // --- Get CSRF Token ---
     function getCookie(name) {
         let cookieValue = null;
@@ -315,58 +376,27 @@
         return cookieValue;
     }
 
-    // --- Key Validation ---
+    // --- Key Validation (local format only) ---
     validateKeyBtn.addEventListener('click', () => {
         const val = keyInput.value.trim();
 
         if (!val) {
             showStatus(keyStatus, keyStatusText, t('msg_key_required'), 'error');
             keyInput.focus();
+            updateStepper();
             return;
         }
 
         if (val.length < 8) {
             showStatus(keyStatus, keyStatusText, t('msg_key_short'), 'error');
+            updateStepper();
             return;
         }
 
-        // Отправляем запрос на сервер для проверки ключа
-        validateKeyBtn.disabled = true;
-        validateKeyBtn.textContent = '...';
-
-        fetch('/api/check-key/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({ key: val, lang: currentLang })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'available') {
-                keyValidated = true;
-                validatedKey = val;  // Сохраняем валидный ключ
-                showStatus(keyStatus, keyStatusText, t('msg_key_ok'), 'success');
-                validateKeyBtn.textContent = t('validate');
-                validateKeyBtn.disabled = false;
-
-                if (currentStep < 2) currentStep = 2;
-                updateStepper();
-            } else {
-                showStatus(keyStatus, keyStatusText, data.message || t('msg_key_fail'), 'error');
-                validateKeyBtn.textContent = t('validate');
-                validateKeyBtn.disabled = false;
-            }
-        })
-        .catch(error => {
-            showStatus(keyStatus, keyStatusText, t('msg_server_error'), 'error');
-            validateKeyBtn.textContent = t('validate');
-            validateKeyBtn.disabled = false;
-            console.error('Error:', error);
-        });
+        validatedKey = val;
+        showStatus(keyStatus, keyStatusText, t('msg_key_ok'), 'success');
+        updateStepper();
     });
-
     // Enter key to validate
     keyInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') validateKeyBtn.click();
@@ -374,125 +404,134 @@
 
     keyInput.addEventListener('input', () => {
         const val = keyInput.value.trim();
-
-        if (keyValidated && val !== validatedKey) {
-            keyValidated = false;
-            authValidated = false;
-            validatedKey = '';
-            validatedAuthSession = '';
-            currentStep = 1;
-            updateStepper();
-            clearStatus(authStatus, authStatusText);
-            clearStatus(activationStatus, activationStatusText);
-            showStatus(keyStatus, keyStatusText, t('msg_key_changed'), 'error');
-            activationState = 'idle';
-            setActivateLabel(t('activate'));
-            activateBtn.disabled = true;
+        validatedKey = val;
+        if (!val) {
+            clearStatus(keyStatus, keyStatusText);
         }
+        clearStatus(activationStatus, activationStatusText);
+        activationState = 'idle';
+        setActivateLabel(t('activate'));
+        updateStepper();
     });
-
-    // --- Auth Validation ---
+    // --- Auth Validation (format check only) ---
     validateAuthBtn.addEventListener('click', () => {
         const val = authTextarea.value.trim();
 
         if (!val) {
             showStatus(authStatus, authStatusText, t('msg_auth_required'), 'error');
             authTextarea.focus();
+            updateStepper();
             return;
         }
 
-        // Try to parse as JSON
-        let authData;
-        try {
-            authData = JSON.parse(val);
-        } catch {
-            showStatus(authStatus, authStatusText, t('msg_json_invalid'), 'error');
-            return;
-        }
-
-        // Проверяем что это токен ChatGPT (должен содержать accessToken и user)
-        if (!authData.accessToken || !authData.user) {
-            showStatus(authStatus, authStatusText, t('msg_auth_invalid'), 'error');
-            return;
-        }
-
-        validateAuthBtn.disabled = true;
-        validateAuthBtn.textContent = '...';
-
-        // Проверяем реальный токен через ChatGPT API
-        fetch('/api/verify-token/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({ auth_session: val, lang: currentLang })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                authValidated = true;
-                validatedAuthSession = val;
-                showStatus(authStatus, authStatusText, data.message || t('msg_auth_ok'), 'success');
-                validateAuthBtn.textContent = t('validate');
-                validateAuthBtn.disabled = false;
-
-                if (currentStep < 3) currentStep = 3;
-                updateStepper();
-            } else {
-                showStatus(authStatus, authStatusText, data.message || t('msg_auth_fail'), 'error');
-                validateAuthBtn.textContent = t('validate');
-                validateAuthBtn.disabled = false;
-            }
-        })
-        .catch(error => {
-            showStatus(authStatus, authStatusText, t('msg_server_error'), 'error');
-            validateAuthBtn.textContent = t('validate');
-            validateAuthBtn.disabled = false;
-            console.error('Error:', error);
-        });
+        validatedAuthSession = val;
+        showStatus(authStatus, authStatusText, t('msg_auth_ok'), 'success');
+        updateStepper();
     });
-
     authTextarea.addEventListener('input', () => {
         const val = authTextarea.value.trim();
-
-        if (authValidated && val !== validatedAuthSession) {
-            authValidated = false;
-            validatedAuthSession = '';
-            currentStep = 2;
-            updateStepper();
-            clearStatus(activationStatus, activationStatusText);
-            showStatus(authStatus, authStatusText, t('msg_auth_changed'), 'error');
-            activationState = 'idle';
-            setActivateLabel(t('activate'));
-            activateBtn.disabled = true;
+        validatedAuthSession = val;
+        if (!val) {
+            clearStatus(authStatus, authStatusText);
         }
+        clearStatus(activationStatus, activationStatusText);
+        activationState = 'idle';
+        setActivateLabel(t('activate'));
+        updateStepper();
     });
-
     // --- Activate ---
     activateBtn.addEventListener('click', () => {
-        if (!keyValidated || !authValidated) return;
+        const keyValue = keyInput.value.trim();
+        const sessionValue = authTextarea.value.trim();
+
+        if (!keyValue) {
+            showStatus(keyStatus, keyStatusText, t('msg_key_required'), 'error');
+            keyInput.focus();
+            updateStepper();
+            return;
+        }
+
+        if (keyValue.length < 8) {
+            showStatus(keyStatus, keyStatusText, t('msg_key_short'), 'error');
+            updateStepper();
+            return;
+        }
+
+        if (!sessionValue) {
+            showStatus(authStatus, authStatusText, t('msg_auth_required'), 'error');
+            authTextarea.focus();
+            updateStepper();
+            return;
+        }
 
         activationState = 'loading';
         activateBtn.disabled = true;
         setActivateLabel(t('msg_activating'));
         showStatus(activationStatus, activationStatusText, t('msg_activating_wait'), 'success');
 
-        // Отправляем запрос на активацию
-        fetch('/api/activate-key/', {
+        fetch('/api/check-plan/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
             body: JSON.stringify({
-                key: validatedKey,
-                auth_session: validatedAuthSession,
+                key: keyValue,
+                auth_session: sessionValue,
                 lang: currentLang
             })
         })
         .then(response => response.json())
+        .then(async (planData) => {
+            if (planData.status === 'blocked') {
+                showStatus(
+                    activationStatus,
+                    activationStatusText,
+                    planData.message || t('msg_plan_plus_blocked'),
+                    'error'
+                );
+                activationState = 'idle';
+                setActivateLabel(t('activate'));
+                activateBtn.disabled = false;
+                return null;
+            }
+
+            if (planData.status === 'warning' && planData.requires_confirmation) {
+                const warningMessage = planData.message || t('msg_plan_warning');
+                const confirmed = await showPlanConfirm(warningMessage);
+
+                if (!confirmed) {
+                    showStatus(activationStatus, activationStatusText, warningMessage, 'error');
+                    activationState = 'idle';
+                    setActivateLabel(t('activate'));
+                    activateBtn.disabled = false;
+                    return null;
+                }
+            }
+
+            return fetch('/api/activate-key/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    key: keyValue,
+                    auth_session: sessionValue,
+                    lang: currentLang
+                })
+            });
+        })
+        .then(response => {
+            if (!response) {
+                return null;
+            }
+            return response.json();
+        })
         .then(data => {
+            if (!data) {
+                return;
+            }
             if (data.status === 'success') {
                 showStatus(
                     activationStatus,

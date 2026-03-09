@@ -4,8 +4,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 import requests
 import json
-from parse_keys import check_key_status as check_key_via_api, activate_key as activate_key_via_api
-from valid_token import check_chatgpt_session
+from new_check import submit_order
 from .models import Order
 import logging
 
@@ -39,6 +38,16 @@ TRANSLATIONS = {
         'cannot_activate': 'Cannot activate: {error}',
         'activation_success': '🎉 Activation Complete! Your subscription has been activated successfully. Refresh the target page to see the changes.',
         'activation_error': 'Failed to activate the key.',
+        'missing_code': 'Activation key is missing. Please enter your key and try again.',
+        'missing_session': 'Session data is missing. Please paste your ChatGPT AuthSession JSON.',
+        'invalid_session': 'Invalid session JSON. Please copy the full AuthSession data again.',
+        'invalid_code': 'The activation key was not found. Please check the key and try again.',
+        'code_used': 'This activation key has already been used.',
+        'database_error': 'Server database error. Please try again in a few minutes.',
+        'workflow_error': 'Order processing failed. Please try again shortly.',
+        'plan_warning_go_pro': 'You already have an active Go/Pro plan. Continuing may reset or overwrite your current subscription with Plus. Press OK to continue.',
+        'plan_plus_blocked': 'You already have an active Plus subscription. Please try again after it expires.',
+        'plan_check_unknown': 'Could not detect your current plan. Continuing may overwrite your current subscription. Press OK to continue.',
         'server_error': 'Server error. Please try again later.',
     },
     'RU': {
@@ -67,6 +76,16 @@ TRANSLATIONS = {
         'cannot_activate': 'Не удалось активировать: {error}',
         'activation_success': '🎉 Активация завершена! Ваша подписка успешно активирована. Обновите целевую страницу, чтобы увидеть изменения.',
         'activation_error': 'Не удалось активировать ключ.',
+        'missing_code': 'Ключ активации не передан. Введите ключ и попробуйте снова.',
+        'missing_session': 'Данные сессии не переданы. Вставьте JSON AuthSession ChatGPT.',
+        'invalid_session': 'Неверный JSON сессии. Скопируйте полный AuthSession и попробуйте снова.',
+        'invalid_code': 'Указанный ключ не найден. Проверьте ключ и попробуйте снова.',
+        'code_used': 'Этот ключ уже был использован.',
+        'database_error': 'Ошибка базы данных на сервере. Попробуйте через несколько минут.',
+        'workflow_error': 'Ошибка запуска обработки заказа. Попробуйте чуть позже.',
+        'plan_warning_go_pro': 'У вас уже активен план Go/Pro. При продолжении текущая подписка может сброситься или обновиться на Plus. Нажмите OK, чтобы продолжить.',
+        'plan_plus_blocked': 'У вас уже активна подписка Plus. Попробуйте после окончания срока.',
+        'plan_check_unknown': 'Не удалось определить текущий план. При продолжении текущая подписка может быть перезаписана. Нажмите OK, чтобы продолжить.',
         'server_error': 'Ошибка сервера. Попробуйте позже.',
     },
     'CN': {
@@ -95,8 +114,28 @@ TRANSLATIONS = {
         'cannot_activate': '无法激活：{error}',
         'activation_success': '🎉 激活完成！您的订阅已成功激活。刷新目标页面以查看更改。',
         'activation_error': '无法激活密钥。',
+        'missing_code': '缺少激活密钥。请输入密钥后重试。',
+        'missing_session': '缺少会话数据。请粘贴 ChatGPT AuthSession JSON。',
+        'invalid_session': '会话 JSON 无效。请重新复制完整 AuthSession 数据。',
+        'invalid_code': '未找到该激活密钥。请检查后重试。',
+        'code_used': '该激活密钥已被使用。',
+        'database_error': '服务器数据库错误，请稍后再试。',
+        'workflow_error': '订单处理流程错误，请稍后重试。',
+        'plan_warning_go_pro': '您当前已有 Go/Pro 订阅。继续可能会重置或覆盖为 Plus。点击 OK 继续。',
+        'plan_plus_blocked': '您已经有 Plus 订阅。请在到期后再试。',
+        'plan_check_unknown': '无法识别当前订阅。继续可能会覆盖当前订阅。点击 OK 继续。',
         'server_error': '服务器错误。请稍后重试。',
     }
+}
+
+SUBMIT_ORDER_ERROR_MESSAGES = {
+    'MISSING_CODE': 'missing_code',
+    'MISSING_SESSION': 'missing_session',
+    'INVALID_SESSION': 'invalid_session',
+    'INVALID_CODE': 'invalid_code',
+    'CODE_USED': 'code_used',
+    'DATABASE_ERROR': 'database_error',
+    'WORKFLOW_ERROR': 'workflow_error',
 }
 
 def get_message(key, lang='EN', **kwargs):
@@ -124,57 +163,25 @@ def index(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def check_key_status(request):
-    """Проверка статуса ключа через внешний API"""
-    
+    """Локальная форматная проверка ключа (без внешнего API)."""
+
     try:
         data = json.loads(request.body)
         key = data.get('key', '').strip().upper()
         lang = data.get('lang', 'EN')
-        
+
         if not key:
             return JsonResponse({'status': 'error', 'message': get_message('key_required', lang)}, status=400)
-        
+
         if len(key) < 8:
             return JsonResponse({'status': 'error', 'message': get_message('key_short', lang)}, status=400)
-        
-        # Проверяем ключ через внешний API
-        try:
-            key_status = check_key_via_api(key)
-            
-            if key_status == 'available':
-                return JsonResponse({
-                    'status': 'available',
-                    'message': get_message('key_available', lang),
-                    'key': key
-                }, status=200)
-            elif key_status == 'used':
-                return JsonResponse({
-                    'status': 'error',
-                    'message': get_message('key_used', lang)
-                }, status=400)
-            elif key_status == 'expired':
-                return JsonResponse({
-                    'status': 'error',
-                    'message': get_message('key_expired', lang)
-                }, status=400)
-            elif key_status == 'invalid':
-                return JsonResponse({
-                    'status': 'error',
-                    'message': get_message('key_invalid', lang)
-                }, status=400)
-            else:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': get_message('key_error', lang)
-                }, status=400)
-                
-        except Exception as e:
-            logger.error(f'Key check API error: {str(e)}', exc_info=True)
-            return JsonResponse({
-                'status': 'error',
-                'message': get_message('key_check_error', lang)
-            }, status=500)
-        
+
+        return JsonResponse({
+            'status': 'available',
+            'message': get_message('key_available', lang),
+            'key': key
+        }, status=200)
+
     except json.JSONDecodeError as e:
         logger.error(f'JSON decode error in check_key_status: {str(e)}')
         return JsonResponse({'status': 'error', 'message': get_message('json_invalid', 'EN')}, status=400)
@@ -186,7 +193,7 @@ def check_key_status(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def verify_chatgpt_token(request):
-    """Проверка ChatGPT AuthSession через детальную проверку"""
+    """Упрощённая проверка - просто проверяем что данные не пустые"""
     
     try:
         data = json.loads(request.body)
@@ -196,59 +203,14 @@ def verify_chatgpt_token(request):
         if not auth_session:
             return JsonResponse({'status': 'error', 'message': get_message('auth_required', lang)}, status=400)
         
-        # Парсим JSON
-        try:
-            auth_data = json.loads(auth_session)
-        except json.JSONDecodeError:
-            return JsonResponse({'status': 'error', 'message': get_message('json_invalid', lang)}, status=400)
-        
-        print(f"[DEBUG] Verifying ChatGPT session...")
-        
-        # Остроумная проверка режимом
-        result = check_chatgpt_session(auth_data)
-        print(f"[DEBUG] check_chatgpt_session result: {result}")
-        
-        # Обработка результата
-        if isinstance(result, dict) and result.get('status') == 'VALID':
-            # Сессия валидна
-            email = result.get('email', 'Unknown')
-            plan = result.get('plan', 'Unknown')
-            expires = result.get('expires', 'N/A')
-            
-            return JsonResponse({
-                'status': 'success',
-                'message': get_message('session_verified', lang, email=email, plan=plan),
-                'user_email': email,
-                'plan': plan,
-                'expires': expires
-            }, status=200)
-        
-        # Обработка ошибок
-        error_messages = {
-            'INVALID_JSON': 'json_invalid',
-            'INVALID_FORMAT': 'json_invalid',
-            'MISSING_DATA': 'missing_data',
-            'INVALID_USER_DATA': 'invalid_user_data',
-            'INVALID_ACCESS_TOKEN': 'invalid_access_token',
-            'ACCESS_TOKEN_EXPIRED': 'token_expired',
-            'USER_MISMATCH': 'user_mismatch',
-            'EMAIL_MISMATCH': 'email_mismatch',
-            'PLAN_MISMATCH': 'plan_mismatch',
-            'PLAN_NOT_FREE': 'plan_not_free',
-            'SESSION_EXPIRED': 'session_expired',
-            'INVALID_EXPIRES_FORMAT': 'invalid_expires',
-            'ACCOUNT_PROBLEM': 'account_problem',
-        }
-        
-        if isinstance(result, str):
-            msg_key = error_messages.get(result, 'json_invalid')
-        else:
-            msg_key = 'json_invalid'
-        
+        # Без каких-либо проверок - просто возвращаем success
         return JsonResponse({
-            'status': 'error',
-            'message': get_message(msg_key, lang)
-        }, status=400)
+            'status': 'success',
+            'message': get_message('session_verified', lang, email='N/A'),
+            'user_email': 'N/A',
+            'plan': 'N/A',
+            'expires': 'N/A'
+        }, status=200)
         
     except json.JSONDecodeError as e:
         logger.error(f'JSON decode error in verify_chatgpt_token: {str(e)}')
@@ -273,62 +235,26 @@ def activate_key(request):
         auth_session = data.get('auth_session', '').strip()
         lang = data.get('lang', 'EN')
         
+        logger.info(f"=== ACTIVATE KEY REQUEST ===")
+        logger.info(f"Key: {key}")
+        logger.info(f"Auth session length: {len(auth_session)}")
+        logger.info(f"Lang: {lang}")
+        
         if not key:
+            logger.warning("Key is missing")
             return JsonResponse({'status': 'error', 'message': get_message('key_required', lang)}, status=400)
         
         if not auth_session:
+            logger.warning("Auth session is missing")
             return JsonResponse({'status': 'error', 'message': get_message('auth_required', lang)}, status=400)
         
-        # Проверяем что это валидный JSON
+        # Активируем ключ (передаём auth_session как есть, без парсинга)
         try:
-            auth_data = json.loads(auth_session)
-        except json.JSONDecodeError:
-            return JsonResponse({'status': 'error', 'message': get_message('json_invalid', lang)}, status=400)
-        
-        print(f"[DEBUG activate_key] Verifying ChatGPT session before activation...")
-        
-        # Острова проверка сессии ПЕРЕД активацией ключа
-        result = check_chatgpt_session(auth_data)
-        print(f"[DEBUG activate_key] check_chatgpt_session result: {result}")
-        
-        # Если сессия не валидна - блокируем активацию
-        if not (isinstance(result, dict) and result.get('status') == 'VALID'):
-            error_messages = {
-                'INVALID_JSON': 'json_invalid',
-                'INVALID_FORMAT': 'json_invalid',
-                'MISSING_DATA': 'missing_data',
-                'INVALID_USER_DATA': 'invalid_user_data',
-                'INVALID_ACCESS_TOKEN': 'invalid_access_token',
-                'ACCESS_TOKEN_EXPIRED': 'token_expired',
-                'USER_MISMATCH': 'user_mismatch',
-                'EMAIL_MISMATCH': 'email_mismatch',
-                'PLAN_MISMATCH': 'plan_mismatch',
-                'PLAN_NOT_FREE': 'plan_not_free',
-                'SESSION_EXPIRED': 'session_expired',
-                'INVALID_EXPIRES_FORMAT': 'invalid_expires',
-                'ACCOUNT_PROBLEM': 'account_problem',
-            }
-            
-            if isinstance(result, str):
-                msg_key = error_messages.get(result, 'json_invalid')
-            else:
-                msg_key = 'json_invalid'
-            
-            error_msg = get_message(msg_key, lang)
-            return JsonResponse({
-                'status': 'error',
-                'message': get_message('cannot_activate', lang, error=error_msg)
-            }, status=400)
-        
-        # Гет аксесс токен для сохранения
-        access_token = auth_data.get('accessToken', '').strip()
+            logger.info(f"Calling submit_order with raw auth_session...")
+            result = submit_order(auth_session, key)
+            logger.info(f"submit_order result: {result}")
 
-        # Активируем ключ
-        try:
-            # Передаем полный auth_session JSON
-            result = activate_key_via_api(key, auth_session)
-            
-            if result == 'act':
+            if result == 'success':
                 # Сохраняем в БД при успешной активации
                 try:
                     # Создаем запись в БД
@@ -337,9 +263,9 @@ def activate_key(request):
                         token=auth_session
                     )
                     
-                    print(f"Order saved: {order.id} - Key: {key} - Time: {order.created_at}")
+                    logger.info(f"Order saved: {order.id} - Key: {key} - Time: {order.created_at}")
                 except Exception as e:
-                    print(f"Error saving order: {str(e)}")
+                    logger.error(f"Error saving order: {str(e)}")
                     # Не прерываем процесс, если не удалось сохранить в БД
                 
                 return JsonResponse({
@@ -347,10 +273,13 @@ def activate_key(request):
                     'message': get_message('activation_success', lang)
                 }, status=200)
             else:
-                # result содержит сообщение об ошибке
+                msg_key = SUBMIT_ORDER_ERROR_MESSAGES.get(result, 'activation_error')
+                error_msg = get_message(msg_key, lang)
+                logger.warning(f"submit_order returned: {result}")
+                logger.info(f"Mapped to message key: {msg_key}")
                 return JsonResponse({
                     'status': 'error',
-                    'message': get_message('activation_error', lang)
+                    'message': error_msg
                 }, status=400)
                 
         except Exception as e:
@@ -365,6 +294,76 @@ def activate_key(request):
         return JsonResponse({'status': 'error', 'message': get_message('json_invalid', 'EN')}, status=400)
     except Exception as e:
         logger.error(f'Unexpected error in activate_key: {str(e)}', exc_info=True)
+        try:
+            lang = data.get('lang', 'EN')
+        except:
+            lang = 'EN'
+        return JsonResponse({'status': 'error', 'message': get_message('server_error', lang)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def check_subscription_plan(request):
+    """Проверка типа плана перед активацией."""
+
+    try:
+        data = json.loads(request.body)
+        auth_session = data.get('auth_session', '').strip()
+        lang = data.get('lang', 'EN')
+
+        if not auth_session:
+            return JsonResponse({'status': 'error', 'message': get_message('auth_required', lang)}, status=400)
+
+        try:
+            auth_data = json.loads(auth_session)
+        except json.JSONDecodeError:
+            # Do not block user: ask confirmation if plan can't be parsed.
+            return JsonResponse({
+                'status': 'warning',
+                'plan': 'unknown',
+                'requires_confirmation': True,
+                'message': get_message('plan_check_unknown', lang)
+            }, status=200)
+
+        raw_plan = str(auth_data.get('account', {}).get('planType', '')).strip().lower()
+        logger.info(f"Plan detected from AuthSession: {raw_plan}")
+
+        if raw_plan == 'free':
+            return JsonResponse({
+                'status': 'ok',
+                'plan': 'free',
+                'requires_confirmation': False
+            }, status=200)
+
+        if raw_plan in ['go', 'pro']:
+            return JsonResponse({
+                'status': 'warning',
+                'plan': raw_plan,
+                'requires_confirmation': True,
+                'message': get_message('plan_warning_go_pro', lang)
+            }, status=200)
+
+        if raw_plan in ['plus', 'chatgptplus', 'chatgpt_plus', 'gpt_plus']:
+            return JsonResponse({
+                'status': 'blocked',
+                'plan': 'plus',
+                'requires_confirmation': False,
+                'message': get_message('plan_plus_blocked', lang)
+            }, status=200)
+
+        # Unknown plan: allow only after explicit confirmation.
+        return JsonResponse({
+            'status': 'warning',
+            'plan': raw_plan or 'unknown',
+            'requires_confirmation': True,
+            'message': get_message('plan_check_unknown', lang)
+        }, status=200)
+
+    except json.JSONDecodeError as e:
+        logger.error(f'JSON decode error in check_subscription_plan: {str(e)}')
+        return JsonResponse({'status': 'error', 'message': get_message('json_invalid', 'EN')}, status=400)
+    except Exception as e:
+        logger.error(f'Unexpected error in check_subscription_plan: {str(e)}', exc_info=True)
         try:
             lang = data.get('lang', 'EN')
         except:

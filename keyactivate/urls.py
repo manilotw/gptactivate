@@ -15,12 +15,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from activator.views import index, check_key_status, activate_key, verify_chatgpt_token
+from activator.views import index, check_key_status, activate_key, verify_chatgpt_token, check_subscription_plan
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', index, name='index'),
     path('api/check-key/', check_key_status, name='check_key_status'),
     path('api/verify-token/', verify_chatgpt_token, name='verify_chatgpt_token'),
+    path('api/check-plan/', check_subscription_plan, name='check_subscription_plan'),
     path('api/activate-key/', activate_key, name='activate_key'),
 ]
