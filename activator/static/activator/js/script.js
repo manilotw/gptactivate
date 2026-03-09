@@ -377,30 +377,30 @@
     }
 
     // --- Key Validation (local format only) ---
-    validateKeyBtn.addEventListener('click', () => {
-        const val = keyInput.value.trim();
-
-        if (!val) {
-            showStatus(keyStatus, keyStatusText, t('msg_key_required'), 'error');
-            keyInput.focus();
-            updateStepper();
-            return;
-        }
-
-        if (val.length < 8) {
-            showStatus(keyStatus, keyStatusText, t('msg_key_short'), 'error');
-            updateStepper();
-            return;
-        }
-
-        validatedKey = val;
-        showStatus(keyStatus, keyStatusText, t('msg_key_ok'), 'success');
-        updateStepper();
-    });
-    // Enter key to validate
-    keyInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') validateKeyBtn.click();
-    });
+    // validateKeyBtn.addEventListener('click', () => {
+    //     const val = keyInput.value.trim();
+    //
+    //     if (!val) {
+    //         showStatus(keyStatus, keyStatusText, t('msg_key_required'), 'error');
+    //         keyInput.focus();
+    //         updateStepper();
+    //         return;
+    //     }
+    //
+    //     if (val.length < 8) {
+    //         showStatus(keyStatus, keyStatusText, t('msg_key_short'), 'error');
+    //         updateStepper();
+    //         return;
+    //     }
+    //
+    //     validatedKey = val;
+    //     showStatus(keyStatus, keyStatusText, t('msg_key_ok'), 'success');
+    //     updateStepper();
+    // });
+    // // Enter key to validate
+    // keyInput.addEventListener('keydown', (e) => {
+    //     if (e.key === 'Enter') validateKeyBtn.click();
+    // });
 
     keyInput.addEventListener('input', () => {
         const val = keyInput.value.trim();
@@ -414,20 +414,20 @@
         updateStepper();
     });
     // --- Auth Validation (format check only) ---
-    validateAuthBtn.addEventListener('click', () => {
-        const val = authTextarea.value.trim();
-
-        if (!val) {
-            showStatus(authStatus, authStatusText, t('msg_auth_required'), 'error');
-            authTextarea.focus();
-            updateStepper();
-            return;
-        }
-
-        validatedAuthSession = val;
-        showStatus(authStatus, authStatusText, t('msg_auth_ok'), 'success');
-        updateStepper();
-    });
+    // validateAuthBtn.addEventListener('click', () => {
+    //     const val = authTextarea.value.trim();
+    //
+    //     if (!val) {
+    //         showStatus(authStatus, authStatusText, t('msg_auth_required'), 'error');
+    //         authTextarea.focus();
+    //         updateStepper();
+    //         return;
+    //     }
+    //
+    //     validatedAuthSession = val;
+    //     showStatus(authStatus, authStatusText, t('msg_auth_ok'), 'success');
+    //     updateStepper();
+    // });
     authTextarea.addEventListener('input', () => {
         const val = authTextarea.value.trim();
         validatedAuthSession = val;

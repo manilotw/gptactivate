@@ -45,8 +45,9 @@ TRANSLATIONS = {
         'code_used': 'This activation key has already been used.',
         'database_error': 'Server database error. Please try again in a few minutes.',
         'workflow_error': 'Order processing failed. Please try again shortly.',
-        'plan_warning_go_pro': 'You already have an active Go/Pro plan. Continuing may reset or overwrite your current subscription with Plus. Press OK to continue.',
-        'plan_plus_blocked': 'You already have an active Plus subscription. Please try again after it expires.',
+        'plan_warning_go': 'You have a Go subscription. Continuing will update it to Plus.',
+        'plan_warning_pro': 'You have a Pro subscription. Continuing will update it to Plus.',
+        'plan_plus_blocked': 'Your Plus subscription will be updated.',
         'plan_check_unknown': 'Could not detect your current plan. Continuing may overwrite your current subscription. Press OK to continue.',
         'server_error': 'Server error. Please try again later.',
     },
@@ -83,8 +84,9 @@ TRANSLATIONS = {
         'code_used': 'Этот ключ уже был использован.',
         'database_error': 'Ошибка базы данных на сервере. Попробуйте через несколько минут.',
         'workflow_error': 'Ошибка запуска обработки заказа. Попробуйте чуть позже.',
-        'plan_warning_go_pro': 'У вас уже активен план Go/Pro. При продолжении текущая подписка может сброситься или обновиться на Plus. Нажмите OK, чтобы продолжить.',
-        'plan_plus_blocked': 'У вас уже активна подписка Plus. Попробуйте после окончания срока.',
+        'plan_warning_go': 'У вас подписка Go. При продолжении она обновится на Plus.',
+        'plan_warning_pro': 'У вас подписка Pro. При продолжении она обновится на Plus.',
+        'plan_plus_blocked': 'Ваша подписка Plus обновится.',
         'plan_check_unknown': 'Не удалось определить текущий план. При продолжении текущая подписка может быть перезаписана. Нажмите OK, чтобы продолжить.',
         'server_error': 'Ошибка сервера. Попробуйте позже.',
     },
@@ -121,8 +123,9 @@ TRANSLATIONS = {
         'code_used': '该激活密钥已被使用。',
         'database_error': '服务器数据库错误，请稍后再试。',
         'workflow_error': '订单处理流程错误，请稍后重试。',
-        'plan_warning_go_pro': '您当前已有 Go/Pro 订阅。继续可能会重置或覆盖为 Plus。点击 OK 继续。',
-        'plan_plus_blocked': '您已经有 Plus 订阅。请在到期后再试。',
+        'plan_warning_go': '您有 Go 订阅。继续将更新为 Plus。',
+        'plan_warning_pro': '您有 Pro 订阅。继续将更新为 Plus。',
+        'plan_plus_blocked': '您的 Plus 订阅将更新。',
         'plan_check_unknown': '无法识别当前订阅。继续可能会覆盖当前订阅。点击 OK 继续。',
         'server_error': '服务器错误。请稍后重试。',
     }
@@ -336,18 +339,19 @@ def check_subscription_plan(request):
             }, status=200)
 
         if raw_plan in ['go', 'pro']:
+            msg_key = f'plan_warning_{raw_plan}'
             return JsonResponse({
                 'status': 'warning',
                 'plan': raw_plan,
                 'requires_confirmation': True,
-                'message': get_message('plan_warning_go_pro', lang)
+                'message': get_message(msg_key, lang)
             }, status=200)
 
         if raw_plan in ['plus', 'chatgptplus', 'chatgpt_plus', 'gpt_plus']:
             return JsonResponse({
-                'status': 'blocked',
+                'status': 'warning',
                 'plan': 'plus',
-                'requires_confirmation': False,
+                'requires_confirmation': True,
                 'message': get_message('plan_plus_blocked', lang)
             }, status=200)
 
