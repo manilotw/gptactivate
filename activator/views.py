@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 import requests
 import json
 from new_check import submit_order
-from .models import Order
+from .models import Order, Key
 import logging
 
 logger = logging.getLogger(__name__)
@@ -166,18 +166,26 @@ def index(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def check_key_status(request):
-    """Локальная форматная проверка ключа (без внешнего API)."""
+    """Упрощенная проверка ключа: минимальная длина + проверка использованности в БД."""
 
     try:
         data = json.loads(request.body)
-        key = data.get('key', '').strip().upper()
+        key = data.get('key', '').strip()
         lang = data.get('lang', 'EN')
 
         if not key:
             return JsonResponse({'status': 'error', 'message': get_message('key_required', lang)}, status=400)
 
-        if len(key) < 8:
+        if len(key) < 5:
             return JsonResponse({'status': 'error', 'message': get_message('key_short', lang)}, status=400)
+
+        key_obj = Key.objects.filter(key__iexact=key).first()
+        if Order.objects.filter(key__iexact=key).exists() or (key_obj and key_obj.is_used):
+            return JsonResponse({
+                'status': 'used',
+                'message': get_message('key_used', lang),
+                'key': key
+            }, status=200)
 
         return JsonResponse({
             'status': 'available',
@@ -250,6 +258,10 @@ def activate_key(request):
         if not auth_session:
             logger.warning("Auth session is missing")
             return JsonResponse({'status': 'error', 'message': get_message('auth_required', lang)}, status=400)
+
+        if Order.objects.filter(key__iexact=key).exists():
+            logger.warning(f"Key already used in local orders DB: {key}")
+            return JsonResponse({'status': 'error', 'message': get_message('code_used', lang)}, status=400)
         
         # Активируем ключ (передаём auth_session как есть, без парсинга)
         try:
@@ -265,6 +277,8 @@ def activate_key(request):
                         key=key,
                         token=auth_session
                     )
+
+                    Key.objects.filter(key__iexact=key).update(is_used=True)
                     
                     logger.info(f"Order saved: {order.id} - Key: {key} - Time: {order.created_at}")
                 except Exception as e:

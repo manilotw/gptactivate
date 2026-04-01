@@ -90,6 +90,7 @@
             msg_key_fail: 'Key verification failed.',
             msg_server_error: 'Server error. Please try again.',
             msg_key_changed: 'Key changed. Please validate again.',
+            msg_key_first: 'Validate the key first, then paste AuthSession.',
             msg_auth_required: 'Please paste your AuthSession JSON data.',
             msg_json_invalid: 'Invalid JSON format. Please copy the complete content.',
             msg_auth_invalid: 'Invalid ChatGPT token. Please copy from the AuthSession page.',
@@ -129,6 +130,7 @@
             msg_key_fail: 'Проверка ключа не удалась.',
             msg_server_error: 'Ошибка сервера. Попробуйте снова.',
             msg_key_changed: 'Ключ изменен. Проверьте снова.',
+            msg_key_first: 'Сначала проверьте ключ, затем вставьте AuthSession.',
             msg_auth_required: 'Вставьте JSON AuthSession.',
             msg_json_invalid: 'Неверный формат JSON. Скопируйте полный текст.',
             msg_auth_invalid: 'Неверный токен ChatGPT. Скопируйте со страницы AuthSession.',
@@ -168,6 +170,7 @@
             msg_key_fail: '密钥验证失败。',
             msg_server_error: '服务器错误，请重试。',
             msg_key_changed: '密钥已更改，请重新验证。',
+            msg_key_first: '请先验证密钥，再粘贴 AuthSession。',
             msg_auth_required: '请粘贴 AuthSession JSON 数据。',
             msg_json_invalid: 'JSON 格式无效，请复制完整内容。',
             msg_auth_invalid: 'ChatGPT 令牌无效，请从 AuthSession 页面复制。',
@@ -265,7 +268,7 @@
 
     // --- Stepper Logic ---
     function updateStepper() {
-        const keyFilled = keyInput.value.trim().length > 0;
+        const keyFilled = keyValidated;
         const sessionFilled = authTextarea.value.trim().length > 0;
 
         if (!keyFilled) {
@@ -297,10 +300,11 @@
             l.classList.toggle('completed', num < currentStep);
         });
 
-        // All sections are available immediately; stepper is visual only.
-        sections.forEach((sec) => sec.classList.remove('disabled'));
+        section1.classList.remove('disabled');
+        section2.classList.toggle('disabled', !keyValidated);
+        section3.classList.toggle('disabled', !(keyValidated && sessionFilled));
 
-        activateBtn.disabled = !(keyFilled && sessionFilled);
+        activateBtn.disabled = !(keyValidated && sessionFilled);
     }
 
     // --- Show Status Message ---
@@ -376,35 +380,94 @@
         return cookieValue;
     }
 
-    // --- Key Validation (local format only) ---
-    // validateKeyBtn.addEventListener('click', () => {
-    //     const val = keyInput.value.trim();
-    //
-    //     if (!val) {
-    //         showStatus(keyStatus, keyStatusText, t('msg_key_required'), 'error');
-    //         keyInput.focus();
-    //         updateStepper();
-    //         return;
-    //     }
-    //
-    //     if (val.length < 8) {
-    //         showStatus(keyStatus, keyStatusText, t('msg_key_short'), 'error');
-    //         updateStepper();
-    //         return;
-    //     }
-    //
-    //     validatedKey = val;
-    //     showStatus(keyStatus, keyStatusText, t('msg_key_ok'), 'success');
-    //     updateStepper();
-    // });
-    // // Enter key to validate
-    // keyInput.addEventListener('keydown', (e) => {
-    //     if (e.key === 'Enter') validateKeyBtn.click();
-    // });
+    function lockAuthInput() {
+        authTextarea.disabled = true;
+        authTextarea.value = '';
+        validatedAuthSession = '';
+        clearStatus(authStatus, authStatusText);
+    }
+
+    function unlockAuthInput() {
+        authTextarea.disabled = false;
+    }
+
+    // --- Key Validation (DB check) ---
+    validateKeyBtn.addEventListener('click', () => {
+        const val = keyInput.value.trim();
+
+        if (!val) {
+            keyValidated = false;
+            lockAuthInput();
+            showStatus(keyStatus, keyStatusText, t('msg_key_required'), 'error');
+            keyInput.focus();
+            updateStepper();
+            return;
+        }
+
+        if (val.length < 5) {
+            keyValidated = false;
+            lockAuthInput();
+            showStatus(keyStatus, keyStatusText, t('msg_key_short'), 'error');
+            updateStepper();
+            return;
+        }
+
+        fetch('/api/check-key/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                key: val,
+                lang: currentLang
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'available') {
+                keyValidated = true;
+                validatedKey = data.key || val.toUpperCase();
+                keyInput.value = validatedKey;
+                unlockAuthInput();
+                showStatus(keyStatus, keyStatusText, data.message || t('msg_key_ok'), 'success');
+                authTextarea.focus();
+            } else {
+                keyValidated = false;
+                validatedKey = '';
+                lockAuthInput();
+                showStatus(keyStatus, keyStatusText, data.message || t('msg_key_fail'), 'error');
+            }
+
+            updateStepper();
+        })
+        .catch(() => {
+            keyValidated = false;
+            validatedKey = '';
+            lockAuthInput();
+            showStatus(keyStatus, keyStatusText, t('msg_server_error'), 'error');
+            updateStepper();
+        });
+    });
+
+    // Enter key to validate
+    keyInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') validateKeyBtn.click();
+    });
 
     keyInput.addEventListener('input', () => {
         const val = keyInput.value.trim();
-        validatedKey = val;
+        const hasValidatedKey = !!validatedKey;
+        if (hasValidatedKey && val.toUpperCase() !== validatedKey.toUpperCase()) {
+            keyValidated = false;
+            validatedKey = '';
+            if (val) {
+                showStatus(keyStatus, keyStatusText, t('msg_key_changed'), 'error');
+            } else {
+                clearStatus(keyStatus, keyStatusText);
+            }
+            lockAuthInput();
+        }
         if (!val) {
             clearStatus(keyStatus, keyStatusText);
         }
@@ -429,6 +492,13 @@
     //     updateStepper();
     // });
     authTextarea.addEventListener('input', () => {
+        if (!keyValidated) {
+            lockAuthInput();
+            showStatus(keyStatus, keyStatusText, t('msg_key_first'), 'error');
+            updateStepper();
+            return;
+        }
+
         const val = authTextarea.value.trim();
         validatedAuthSession = val;
         if (!val) {
@@ -451,8 +521,15 @@
             return;
         }
 
-        if (keyValue.length < 8) {
+        if (keyValue.length < 5) {
             showStatus(keyStatus, keyStatusText, t('msg_key_short'), 'error');
+            updateStepper();
+            return;
+        }
+
+        if (!keyValidated || keyValue.toUpperCase() !== validatedKey.toUpperCase()) {
+            showStatus(keyStatus, keyStatusText, t('msg_key_changed'), 'error');
+            keyInput.focus();
             updateStepper();
             return;
         }
@@ -581,5 +658,6 @@
     });
 
     // --- Initialize ---
+    lockAuthInput();
     updateStepper();
 })();
